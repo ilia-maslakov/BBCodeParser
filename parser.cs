@@ -113,6 +113,12 @@ namespace BBCodeParser
                     res.Attr = ExtractAttr(text, res.Tag);
                     return res;
                 }
+                if (String.Compare(text.Substring(0, 5).ToUpper(), "[IMG=") == 0)
+                {
+                    res.Tag = Tags.IMG;
+                    res.TagType = TagTypes.Open;
+                    return res;
+                }
             }
 
             switch (text.ToUpper())
@@ -169,6 +175,10 @@ namespace BBCodeParser
                     res.Tag = Tags.URL;
                     res.TagType = TagTypes.Close;
                     break;
+                case "[URL]":
+                    res.Tag = Tags.URL;
+                    res.TagType = TagTypes.Open;
+                    break;
                 case "[QUOTE]":
                     res.Tag = Tags.QUOTE;
                     res.TagType = TagTypes.Open;
@@ -196,13 +206,17 @@ namespace BBCodeParser
             {
                 tmptl.Add(t);
             }
+            if (tmptl.Count == 0 && Decoration.Tag != Tags.NORMAL)
+            {
+                tmptl.Add(Decoration.Tag);
+            }
             Entity e = new Entity {
                 Id = (Decoration.Tag.ToString() + index.ToString()),
                 TagList = tmptl,
                 Attr = Decoration.Attr,
                 Value = text
             };
-            StringList.Add(e); 
+            StringList.Add(e);
         }
 
         static string Parse(string text)
@@ -215,10 +229,55 @@ namespace BBCodeParser
             {
                 ch = text[i];
                 //Console.Write(text[i]);
-                if (state == PState.SearchingTag && (ch == '[' || i == (text.Length - 1))) {
-                    state = PState.InTag;
-                    AddTaggedStr(stackstr, tres, i);
-                    stackstr = "";
+                if (state == PState.SearchingTag)
+                {
+                    if (ch == '[')
+                    {
+                        state = PState.InTag;
+                        AddTaggedStr(stackstr, tres, i);
+                        stackstr = "";
+                    }
+                    if (ch == 'h' && text.Length > i + 8)
+                    {
+                        //found http(s) signature
+                        String foundedUrl = "";
+                        if (text[i + 1] == 't' && text[i + 2] == 't' && text[i + 3] == 'p' && text[i + 6] == '/')
+                        {
+                            if (stackstr.Length > 0)
+                            {
+                                AddTaggedStr(stackstr, tres, i);
+                                stackstr = "";
+                            }
+                            for (int j = i; j < text.Length; j++)
+                            {
+                                int nextj = j + 1;
+                                if (nextj < text.Length && tres.Tag != Tags.IMG && tres.Tag != Tags.URL)
+                                {
+                                    foundedUrl = foundedUrl + text[j];
+                                    if (text[nextj] == '[')
+                                    {
+                                        TagResult tmp = IsTag("[url]");
+                                        AddTaggedStr(foundedUrl, tmp, i);
+                                        Console.WriteLine("нашли [");
+                                        break;
+                                    }
+                                    if (text[nextj] == ' ' || text[nextj] == '\t' || text[nextj] == '\n')
+                                    {
+                                        TagResult tmp = IsTag("[url]");
+                                        AddTaggedStr(foundedUrl, tmp, i);
+                                        Console.WriteLine("нашли конец урла");
+                                        break;
+                                    }
+                                }
+                            }
+                            if (foundedUrl.Length > 1)
+                            {
+                                stackstr = "";
+                                i += foundedUrl.Length;
+                                continue;
+                            }
+                        }
+                    }
                 }
                 stackstr = stackstr + ch;
                 if (state == PState.InTag) { 
@@ -234,6 +293,16 @@ namespace BBCodeParser
                         else if (tres.TagType == TagTypes.Close)
                         {
                             OpenedTagStack.TryPop(out Tags d);
+                            if (OpenedTagStack.Count > 0)
+                            {
+                                var lastTag = OpenedTagStack.Peek();
+                                tres.Tag = lastTag;
+                            }
+                            else
+                            {
+                                tres.Tag = Tags.NORMAL;
+                            }
+                            
                         }
                         stackstr = "";
                     }
@@ -244,7 +313,7 @@ namespace BBCodeParser
         static void Main(string[] args)
         {
             StringList = new List<Entity>();
-            var s = "e[b]ss[/b]r[url=http://werterwt.rwe/3243423][b]fdhfdhgfdhgfdhd[/b][/url][quote=:@wewrew][h]eyter[i]werterw[b]erwterwter[/b]ewtew[/i][/h]werterwtewrtrew[/quote]    [quote=1234321-2134213:@wewrew]1111111111111111[/quote] [quote]22222222222222222[/quote]";
+            var s = "http://qwerty.com [img=1.com]http://img.com/1.jpg[/img] e[b]ss[/b]r[url=http://werterwt.rwe/3243423][b]fdhfdhgfdhgfdhd[/b][/url][quote=:@wewrew][h]eyter[i]werterw[b]erwterwter[/b]ewtew[/i][/h]werterwtewrtrew[/quote]    [quote=1234321-2134213:@wewrew]1111111111111111[/quote] [quote]22222222222222222[/quote]";
             Console.WriteLine(s);
             Parse(s);
             foreach(var e in StringList)
