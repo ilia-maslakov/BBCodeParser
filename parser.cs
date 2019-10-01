@@ -259,6 +259,7 @@ namespace BBCodeParser
                                         TagResult tmp = IsTag("[url]");
                                         AddTaggedStr(foundedUrl, tmp, i);
                                         Console.WriteLine("нашли [");
+                                        i--;
                                         break;
                                     }
                                     if (text[nextj] == ' ' || text[nextj] == '\t' || text[nextj] == '\n')
