@@ -71,6 +71,11 @@ class Parser {
         res.attr = extractAttr(text, res.tag);
         return res;
       }
+      if (s == "[IMG=") {
+        res.tag = Tags.IMG;
+        res.tagType = TagTypes.Open;
+        return res;
+      }
     }
 
     switch (text.toUpperCase()) {
@@ -126,6 +131,10 @@ class Parser {
         res.tag = Tags.URL;
         res.tagType = TagTypes.Close;
         break;
+      case "[URL]":
+        res.tag = Tags.URL;
+        res.tagType = TagTypes.Open;
+        break;
       case "[QUOTE]":
         res.tag = Tags.QUOTE;
         res.tagType = TagTypes.Open;
@@ -151,7 +160,9 @@ class Parser {
     openedTagStack.forEach((value) {
       tmpTL.add(value);
     });
-
+    if (openedTagStack.lenght == 0 && decoration.tag != Tags.NORMAL) {
+      tmpTL.add(decoration.tag);
+    }
     Entity e = new Entity(decoration.tag.toString() + index.toString(), text, decoration.attr, tmpTL);
     stringList.add(e);
   }
@@ -166,29 +177,65 @@ class Parser {
     for (int i = 0; i < text.length; i++)
     {
       ch = text[i];
-      if (state == PState.SearchingTag && (ch == '[' || i == (text.length - 1))) {
-        state = PState.InTag;
-        addTaggedStr(stackstr, tres, i);
-        stackstr = "";
+      if (state == PState.SearchingTag) {
+        if (ch == '[') {
+          state = PState.InTag;
+          addTaggedStr(stackstr, tres, i);
+          stackstr = "";
+        }
+        if (ch == 'h' && text.Length > i + 8) {
+          //found http(s) signature
+          String foundedUrl = '';
+          if (text[i + 1] == 't' && text[i + 2] == 't' && text[i + 3] == 'p' && text[i + 6] == '/') {
+            if (stackstr.length > 0) {
+              AddTaggedStr(stackstr, tres, i);
+              stackstr = '';
+            }
+            for (int j = i; j < text.length; j++) {
+              int nextj = j + 1;
+              if (nextj < text.length && tres.tag != Tags.IMG && tres.tag != Tags.URL) {
+                foundedUrl = foundedUrl + text[j];
+                if (text[nextj] == '[') {
+                  TagResult tmp = thisTagIs('[url]');
+                  AddTaggedStr(foundedUrl, tmp, i);
+                  print('нашли [');
+                  i--;
+                  break;
+                }
+                if (text[nextj] == ' ' || text[nextj] == '\t' || text[nextj] == '\n') {
+                  TagResult tmp = IsTag('[url]');
+                  AddTaggedStr(foundedUrl, tmp, i);
+                  print("нашли конец урла");
+                  break;
+                }
+              }
+            }
+          if (foundedUrl.length > 1) {
+            stackstr = '';
+            i += foundedUrl.length;
+            continue;
+          }
+        }
       }
       stackstr = stackstr + ch;
       if (state == PState.InTag) {
 
-        if (ch == ']')
-        {
+        if (ch == ']') {
           state = PState.SearchingTag;
           tres = thisTagIs(stackstr);
-          if (tres.tagType == TagTypes.Open)
-          {
+          if (tres.tagType == TagTypes.Open) {
             openedTagStack.add(tres.tag);
-          }
-          else if (tres.tagType == TagTypes.Close)
-          {
+          } else if (tres.tagType == TagTypes.Close) {
             if (openedTagStack.length > 0) {
               openedTagStack.removeLast();
+              if (openedTagStack.length > 0) {
+                tres.tag = openedTagStack.tag;
+              } else {
+                tres.tag = Tags.NORMAL;
+              }
             }
           }
-          stackstr = "";
+          stackstr = '';
         }
       }
     }
