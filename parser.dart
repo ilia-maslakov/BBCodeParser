@@ -152,6 +152,7 @@ class Parser {
     if (decoration == null) {
       return;
     }
+    print('PARSED $text');
     List<Tags> tmpTL = new List<Tags>();
     openedTagStack.forEach((value) {
       tmpTL.add(value);
@@ -162,10 +163,17 @@ class Parser {
     Entity e = new Entity(decoration.tag.toString() + index.toString(), text, decoration.attr, tmpTL);
     stringList.add(e);
   }
+  static bool isEndUrl(String ch) {
+    if (ch == ' ' || ch == '\t' || ch == '\n' || ch == '[' || ch == ']' || ch == '(' || ch == ')') {
+      return true;
+    }
+    return false;
+  }
 
   static List<Entity> parse(String text) {
     var state = PState.SearchingTag;
     var ch;
+    print('RAW $text');
     stringList.clear();
     TagResult tres = thisTagIs('');
     String stackstr = '';
@@ -186,26 +194,15 @@ class Parser {
               addTaggedStr(stackstr, tres, i);
               stackstr = '';
             }
-            for (int j = i; j < text.length; j++) {
-              int nextj = j + 1;
-              if (nextj < text.length && tres.tag != Tags.IMG && tres.tag != Tags.URL) {
-                foundedUrl = foundedUrl + text[j];
-                if (text[nextj] == '[') {
-                  TagResult tmp = thisTagIs('[url]');
-                  addTaggedStr(foundedUrl, tmp, i);
-                  i--;
-                  break;
-                }
-                if (text[nextj] == ' ' || text[nextj] == '\t' || text[nextj] == '\n') {
-                  TagResult tmp = thisTagIs('[url]');
-                  addTaggedStr(foundedUrl, tmp, i);
-                  break;
-                }
-              }
+            for (int j = i; j < text.length && !isEndUrl(text[j]); j++) {
+              foundedUrl = foundedUrl + text[j];
             }
             if (foundedUrl.length > 1) {
+              TagResult tmp = thisTagIs('[url]');
+              addTaggedStr(foundedUrl, tmp, i);
+              i += foundedUrl.length - 1;
+              foundedUrl = '';
               stackstr = '';
-              i += foundedUrl.length;
               continue;
             }
           }
